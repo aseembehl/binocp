@@ -94,12 +94,12 @@ double* add_list_nn(SVECTOR *a, long totwords)
 }
 
 
-double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double C, int *valid_examples, int **robust_candidates_array) {
+double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double C, int *valid_examples, LATENT_VAR *hbars) {
 
   long i, j;
   SVECTOR *f, *fy, *fybar, *lhs;
   LABEL       ybar;
-  LATENT_VAR hbar;
+  //LATENT_VAR hbar;
   double lossval, margin;
   double *new_constraint;
 	double obj = 0.0;
@@ -112,11 +112,11 @@ double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, 
 		if(!valid_examples[i])
 			continue;
 
-    find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm, robust_candidates_array[i]);
+    find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbars[i], sm, sparm);
     /* get difference vector */
     fy = copy_svector(fycache[i]);
-    fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
-    lossval = loss(ex[i].y,ybar,hbar,sparm);
+    fybar = psi(ex[i].x,ybar,hbars[i],sm,sparm);
+    lossval = loss(ex[i].y,ybar,hbars[i],sparm);
 
     /* scale difference vector */
     for (f=fy;f;f=f->next) {
@@ -165,12 +165,12 @@ int compar(const void *a, const void *b)
 
 
 SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm,
-														int *valid_examples, int **robust_candidates_array) {
+														int *valid_examples, LATENT_VAR *hbars) {
 
   long i, j;
   SVECTOR *f, *fy, *fybar, *lhs;
   LABEL       ybar;
-  LATENT_VAR hbar;
+  //LATENT_VAR hbar;
   double lossval;
   double *new_constraint;
 	long valid_count = 0;
@@ -195,13 +195,13 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 			continue;
 		}
 
-    find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm, robust_candidates_array[i]);
+    find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbars[i], sm, sparm);
     /* get difference vector */
     fy = copy_svector(fycache[i]);
-    fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
-    lossval = loss(ex[i].y,ybar,hbar,sparm);
+    fybar = psi(ex[i].x,ybar,hbars[i],sm,sparm);
+    lossval = loss(ex[i].y,ybar,hbars[i],sparm);
     free_label(ybar);
-    free_latent_var(hbar);
+    //free_latent_var(hbar);
 		
     /* scale difference vector */
     for (f=fy;f;f=f->next) {
@@ -252,7 +252,7 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 }
 
 double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
-															STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, int **robust_candidates_array) {
+															STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, LATENT_VAR *hbars) {
   long i,j;
   double *alpha;
   DOC **dXc; /* constraint matrix */
@@ -311,7 +311,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
   printf("Running structural SVM solver: "); fflush(stdout); 
 
-	new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples, robust_candidates_array);
+	new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples, hbars);
  	value = margin - sprod_ns(w, new_constraint);
 	while((value>threshold+epsilon)&&(iter<MAX_ITER)) {
 		iter+=1;
@@ -445,7 +445,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 		else
 			threshold = 0.0;
 
- 		new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples, robust_candidates_array);
+ 		new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples, hbars);
    	value = margin - sprod_ns(w, new_constraint);
 
 		if((iter % CLEANUP_CHECK) == 0)
@@ -456,7 +456,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
  	} // end cutting plane while loop 
 
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples, robust_candidates_array);
+	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples, hbars);
 
   printf(" Inner loop optimization finished.\n"); fflush(stdout); 
       
@@ -513,57 +513,9 @@ int bb_score_comp(const void *a, const void *b) {
         return -1;
     }
 }
-void update_robust_examples(long m, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int **robust_candidates_array){
-  	int i, j;
-    double score;
-    double minScore = DBL_MAX;
-
-    // select atleast one bbox from each neg image.
-    // This would be the one with the min. score,
-    // since we are removing bboxes with high score(confusing examples) 
-    int *safeArray = (int *)malloc(m*sizeof(int)); // stores index of the bbox which is safe for each neg. image
-    for(i = 0; i < m; i++){
-        minScore = DBL_MAX;
-        if(ex[i].y.label == 0){
-            for(j = 0; j < ex[i].x.n_candidates; j++){
-                score = sprod_ns(sm->w, ex[i].x.phis[j]);
-                if(score < minScore){
-                    minScore = score;
-                    safeArray[i] = j;
-                }
-            }
-            robust_candidates_array[i][safeArray[i]] = 1;
-        }
-    }
-
-    BB_SCORE *negBBScores = NULL;
-    int negBBCount = 0;
-  	for (i = 0; i < m; i++){
-    		if(ex[i].y.label == 0){
-            for (j = 0; j < ex[i].x.n_candidates; j++){
-                if(j != safeArray[i]){
-                    negBBCount++;
-                    negBBScores = (BB_SCORE *)realloc(negBBScores, negBBCount*sizeof(BB_SCORE));
-                    negBBScores[negBBCount-1].img_idx = i;
-                    negBBScores[negBBCount-1].bb_idx = j;
-                    negBBScores[negBBCount-1].bb_score = sprod_ns(sm->w, ex[i].x.phis[j]);
-                }
-            }
-    		}
-  	}
-    qsort(negBBScores, negBBCount, sizeof(BB_SCORE), bb_score_comp);
-
-    int n_neg_bb_remove = (int)(sparm->robust_cent*negBBCount);
-    for(i = 0; i < n_neg_bb_remove; i++){
-        robust_candidates_array[negBBScores[i].img_idx][negBBScores[i].bb_idx] = 0;
-    }
-    for(i = n_neg_bb_remove; i < negBBCount; i++){
-        robust_candidates_array[negBBScores[i].img_idx][negBBScores[i].bb_idx] = 1;
-    }
-}
 
 int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
-													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, int **robust_candidates_array) {
+													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, LATENT_VAR *hbars) {
 
 	long i, j;
 
@@ -576,7 +528,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 
 	sortStruct *slack = (sortStruct *) malloc(m*sizeof(sortStruct));
 	LABEL ybar;
-	LATENT_VAR hbar;
+	//LATENT_VAR hbar;
 	SVECTOR *f, *fy, *fybar;
 	double lossval;
 	double penalty = 1.0/spl_weight;
@@ -584,11 +536,11 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 		penalty = DBL_MAX;
 
 	for (i=0;i<m;i++) {
-		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm, robust_candidates_array[i]);
+		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbars[i], sm, sparm);
 		fy = copy_svector(fycache[i]);
-		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
+		fybar = psi(ex[i].x,ybar,hbars[i],sm,sparm);
 		slack[i].index = i;
-		slack[i].val = loss(ex[i].y,ybar,hbar,sparm);
+		slack[i].val = loss(ex[i].y,ybar,hbars[i],sparm);
 		for (f=fy;f;f=f->next) {
 			j = 0;
 			while (1) {
@@ -628,7 +580,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 }
 
 double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
-                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, int **robust_candidates_array) {
+                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, LATENT_VAR *hbars) {
 
 	long i;
 	int iter = 0, converged, nValid;
@@ -639,8 +591,8 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 
 	for (i=0;i<sm->sizePsi+1;i++)
 		best_w[i] = w[i];
-	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, robust_candidates_array);
-	last_relaxed_primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples, robust_candidates_array);
+	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, hbars);
+	last_relaxed_primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples, hbars);
 	if(nValid < m)
 		last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 
@@ -649,14 +601,14 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 	}
 
 	for (iter=0;;iter++) {
-		nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, robust_candidates_array);
+		nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, hbars);
 		printf("ACS Iteration %d: number of examples = %d\n",iter,nValid); fflush(stdout);
 		converged = check_acs_convergence(prev_valid_examples,valid_examples,m);
 		if(converged)
 			break;
 		for (i=0;i<sm->sizePsi+1;i++)
 			w[i] = 0.0;
-		relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples, robust_candidates_array);
+		relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples, hbars);
 		if(nValid < m)
 			relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 		decrement = last_relaxed_primal_obj-relaxed_primal_obj;
@@ -692,7 +644,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 	}
 
 	double primal_obj;
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, prev_valid_examples, robust_candidates_array);
+	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, prev_valid_examples, hbars);
 	
 	free(prev_valid_examples);
 	free(best_w);
@@ -770,6 +722,46 @@ double compute_current_loss(SAMPLE val, STRUCTMODEL *sm, STRUCT_LEARN_PARM *spar
 	return cur_loss;
 }
 
+double negative_mine_loop(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
+                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) 
+                               {
+    double decrement;
+    double primal_obj, last_primal_obj;
+    double stop_crit; 
+
+    int iter = 0;
+    last_primal_obj = DBL_MAX;
+    decrement = 0;
+    int i = 0;
+
+    LATENT_VAR *hbars = malloc(m*sizeof(LATENT_VAR));
+
+    while ((iter<2)||(!stop_crit)) { 
+      printf("NEG MINE ITER %d\n", iter); fflush(stdout);
+
+      for (i=0;i<m;i++) {
+          mine_negative_latent_variables(ex[i].x, &hbars[i], sm);
+      }
+          
+      primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples, spl_weight, hbars);
+
+      decrement = last_primal_obj - primal_obj;
+        last_primal_obj = primal_obj;
+        printf("neg mine primal objective: %.4f\n", primal_obj);
+      if (iter) {
+          printf(" neg mine decrement: %.4f\n", decrement); fflush(stdout);
+      }
+      else {
+        printf("neg mine decrement: N/A\n"); fflush(stdout);
+      }
+      
+      stop_crit = (decrement<C*epsilon);    
+      iter++;
+  } 
+
+  free(hbars);
+  return(primal_obj); 
+}   
 
 int main(int argc, char* argv[]) {
 
@@ -802,10 +794,6 @@ int main(int argc, char* argv[]) {
 	double spl_weight;
 	double spl_factor;
 	int *valid_examples;
-
-	/* robust learning variables */
-	int **robust_candidates_array;
-
 	
   /* read input parameters */
 	my_read_input_parameters(argc, argv, trainfile, modelfile, objfile, &learn_parm, &kernel_parm, &sparm, 
@@ -831,18 +819,6 @@ int main(int argc, char* argv[]) {
 	}
   ex = sample.examples;
   m = sample.n;
-
-
-
-  /* initialize robust candidates
-  	for positive examples, robust_canidates is irellevant, as it is always set to 1. */
-  	robust_candidates_array = (int **)malloc(m*sizeof(int *));
-  	for(i = 0; i < m; i++){
-  		robust_candidates_array[i] = (int *)malloc(ex[i].x.n_candidates*sizeof(int));
-  		for(j = 0; j < ex[i].x.n_candidates; j++){
-  			robust_candidates_array[i][j] = 1;
-  		}
-  	}
   
   /* initialization */
   init_struct_model(alldata,&sm,&sparm,&learn_parm,&kernel_parm); 
@@ -882,10 +858,10 @@ int main(int argc, char* argv[]) {
 		}
 		int initIter;
 		for (initIter=0;initIter<2;initIter++) {
-			primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, robust_candidates_array);
+			//primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, hbars);
   		for (i=0;i<m;i++) {
-   	 		free_latent_var(ex[i].h);
-   	 		ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
+   	 		//free_latent_var(ex[i].h);
+   	 		//ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
    		}
 	    for (i=0;i<m;i++) {
   	    free_svector(fycache[i]);
@@ -917,7 +893,7 @@ int main(int argc, char* argv[]) {
     /* cutting plane algorithm */
     //primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
 		/* solve biconvex self-paced learning problem */
-		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight, robust_candidates_array);
+		primal_obj = negative_mine_loop(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
 
 		int nValid = 0;
 		for (i=0;i<m;i++) {
@@ -943,15 +919,12 @@ int main(int argc, char* argv[]) {
 			stop_crit = 0;
 		if(!latent_update)
 			stop_crit = 0;
-
-	/* update robust examples and candidates */
-		update_robust_examples(m, ex, &sm, &sparm, robust_candidates_array);
   
     /* impute latent variable using updated weight vector */
 		if(nValid) {
     	for (i=0;i<m;i++) {
       	free_latent_var(ex[i].h);
-      	ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
+      	ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm, outer_iter);
     	}
 			latent_update++;
 		}
@@ -1011,10 +984,6 @@ int main(int argc, char* argv[]) {
   free(fycache);
 
 	free(valid_examples);
-	for(i = 0; i < m; i++){
-		free(robust_candidates_array[i]);
-	}
-	free(robust_candidates_array);
    
   return(0); 
   

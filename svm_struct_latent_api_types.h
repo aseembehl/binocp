@@ -22,13 +22,6 @@ typedef struct bbScore{
     double bb_score;
 } BB_SCORE;
 
-typedef struct bbox {
-  int min_x;
-  int min_y;
-  int width;
-  int height;
-} BBOX;
-
 typedef struct pattern {
   /*
     Type definition for input pattern x
@@ -37,11 +30,7 @@ typedef struct pattern {
 
   char file_name[1000];
   int n_candidates;
-  BBOX *boxes;
-  int *id_map;
-  SVECTOR **phis;
-  int *bbox_labels;
-  int supervised_positive;
+  int *areaRatios;
 } PATTERN;
 
 typedef struct label {
@@ -62,6 +51,7 @@ typedef struct latent_var {
     Type definition for latent variable h
   */
     int best_bb;
+    SVECTOR *phi_h_i;
 } LATENT_VAR;
 
 typedef struct example {
