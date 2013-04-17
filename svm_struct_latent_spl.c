@@ -758,7 +758,9 @@ double negative_mine_loop(double *w, long m, int MAX_ITER, double C, double epsi
       stop_crit = (decrement<C*epsilon);    
       iter++;
   } 
-
+  for (i=0;i<m;i++) {
+    free_latent_var(hbars[i]);
+  }  
   free(hbars);
   return(primal_obj); 
 }   
