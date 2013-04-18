@@ -104,6 +104,7 @@ typedef struct struct_learn_parm {
   double robust_cent;
   double j;
   int isInitByBinSVM;
+  int initIter;
 
   double gram_regularization;
 } STRUCT_LEARN_PARM;
