@@ -612,12 +612,12 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		if(nValid < m)
 			relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 		decrement = last_relaxed_primal_obj-relaxed_primal_obj;
-    printf("relaxed primal objective: %.4f\n", relaxed_primal_obj);
+    printf("acs relaxed primal objective: %.4f\n", relaxed_primal_obj);
 		if (iter) {
-    	printf("decrement: %.4f\n", decrement); fflush(stdout);
+    	printf("acs decrement: %.4f\n", decrement); fflush(stdout);
 		}
 		else {
-			printf("decrement: N/A\n"); fflush(stdout);
+			printf("acs decrement: N/A\n"); fflush(stdout);
 		}
 		if (decrement>=0.0) {
 			for (i=0;i<sm->sizePsi+1;i++) {
@@ -741,13 +741,17 @@ double negative_mine_loop(double *w, long m, int MAX_ITER, double C, double epsi
 
       for (i=0;i<m;i++) {
           mine_negative_latent_variables(ex[i].x, &hbars[i], sm);
+
+          if(i % 500 == 0){
+              printf("%ld Postive image\n", i); fflush(stdout);
+          } 
       }
           
       primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples, spl_weight, hbars);
 
       decrement = last_primal_obj - primal_obj;
-        last_primal_obj = primal_obj;
-        printf("neg mine primal objective: %.4f\n", primal_obj);
+      last_primal_obj = primal_obj;
+      printf("neg mine primal objective: %.4f\n", primal_obj);
       if (iter) {
           printf(" neg mine decrement: %.4f\n", decrement); fflush(stdout);
       }
@@ -757,10 +761,12 @@ double negative_mine_loop(double *w, long m, int MAX_ITER, double C, double epsi
       
       stop_crit = (decrement<C*epsilon);    
       iter++;
+
+      for (i=0;i<m;i++) {
+        free_latent_var(hbars[i]);
+      }  
   } 
-  for (i=0;i<m;i++) {
-    free_latent_var(hbars[i]);
-  }  
+  
   free(hbars);
   return(primal_obj); 
 }   
@@ -849,15 +855,18 @@ int main(int argc, char* argv[]) {
   /* impute latent variable for first iteration */
   //init_latent_variables(&sample,&learn_parm,&sm,&sparm);
 
-  // added by aseem. impute latent variable using updated weight vector
+  // added by aseem. Impute latent variable using updated weight vector
   outer_iter = 0;
   if (sparm.isInitByBinSVM){
     for (i=0;i<m;i++) {
         free_latent_var(ex[i].h);
-        ex[i].h = infer_latent_variables(ex[0].x, ex[0].y, &sm, &sparm, sparm.initIter);
+        ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm, sparm.initIter);
     }
-  }  
-  outer_iter = 1 + sparm.initIter;
+    outer_iter = 1 + sparm.initIter;
+  }   
+  else{
+    init_latent_variables(&sample,&learn_parm,&sm,&sparm);
+  }
   // added by aseem 
 
 
@@ -927,12 +936,12 @@ int main(int argc, char* argv[]) {
     /* compute decrement in objective in this outer iteration */
     decrement = last_primal_obj - primal_obj;
     last_primal_obj = primal_obj;
-    printf("primal objective: %.4f\n", primal_obj);
+    printf("cccp primal objective: %.4f\n", primal_obj);
 		if (outer_iter) {
-    	printf("decrement: %.4f\n", decrement); fflush(stdout);
+    	printf("cccp decrement: %.4f\n", decrement); fflush(stdout);
 		}
 		else {
-			printf("decrement: N/A\n"); fflush(stdout);
+			printf("cccp decrement: N/A\n"); fflush(stdout);
 		}
     
     stop_crit = (decrement<C*epsilon);
