@@ -851,8 +851,10 @@ int main(int argc, char* argv[]) {
 
   // added by aseem. impute latent variable using updated weight vector
   if (sparm.isInitByBinSVM){
-    free_latent_var(ex[i].h);
-    ex[i].h = infer_latent_variables(ex[0].x, ex[0].y, &sm, &sparm, 0);
+    for (i=0;i<m;i++) {
+        free_latent_var(ex[i].h);
+        ex[i].h = infer_latent_variables(ex[0].x, ex[0].y, &sm, &sparm, 0);
+    }
   }  
   // added by aseem 
 
