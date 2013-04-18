@@ -43,7 +43,7 @@
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *objfile, 
+void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *init_modelfile, char *objfile, 
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm, 
 						double *init_spl_weight, double *spl_factor);
 
@@ -775,6 +775,7 @@ int main(int argc, char* argv[]) {
   KERNEL_PARM kernel_parm;
   char trainfile[1024];
   char modelfile[1024];
+  char init_modelfile[1024];
   char objfile[1024];
   int MAX_ITER;
   /* new struct variables */
@@ -798,7 +799,7 @@ int main(int argc, char* argv[]) {
 	int *valid_examples;
 	
   /* read input parameters */
-	my_read_input_parameters(argc, argv, trainfile, modelfile, objfile, &learn_parm, &kernel_parm, &sparm, 
+	my_read_input_parameters(argc, argv, trainfile, modelfile, init_modelfile, objfile, &learn_parm, &kernel_parm, &sparm, 
 													&init_spl_weight, &spl_factor); 
 
   epsilon = learn_parm.eps;
@@ -827,6 +828,14 @@ int main(int argc, char* argv[]) {
 
   w = create_nvector(sm.sizePsi);
   clear_nvector(w, sm.sizePsi);
+  
+   // added by aseem
+  if (sparm.isInitByBinSVM){
+    sm = read_struct_model(init_modelfile, &sparm);
+    for (i=0;i<sm.sizePsi+1;i++)
+      w[i] = sm.w[i]; 
+  }// added by aseem
+
   sm.w = w; /* establish link to w, as long as w does not change pointer */
 
   /* some training information */
@@ -838,7 +847,14 @@ int main(int argc, char* argv[]) {
   
 
   /* impute latent variable for first iteration */
-  init_latent_variables(&sample,&learn_parm,&sm,&sparm);
+  //init_latent_variables(&sample,&learn_parm,&sm,&sparm);
+
+  // added by aseem. impute latent variable using updated weight vector
+  if (sparm.isInitByBinSVM){
+    free_latent_var(ex[i].h);
+    ex[i].h = infer_latent_variables(ex[0].x, ex[0].y, &sm, &sparm, 0);
+  }  
+  // added by aseem 
 
 
   /* prepare feature vector cache for correct labels with imputed latent variables */
@@ -993,7 +1009,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *objfile, 
+void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *init_modelfile, char *objfile, 
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,
 						double *init_spl_weight, double *spl_factor) {
   
@@ -1053,6 +1069,14 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 		strcpy (modelfile, "lssvm.model");
 	}
 	strcpy (objfile, argv[i+2]);
+
+  if((i+3)<argc) {
+      struct_parm->isInitByBinSVM = 1;
+      strcpy (init_modelfile, argv[i+3]);
+    }
+    else{
+      struct_parm->isInitByBinSVM = 0;
+    }
 
 	/* self-paced learning weight should be non-negative */
 	if(*init_spl_weight < 0.0)

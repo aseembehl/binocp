@@ -103,6 +103,7 @@ typedef struct struct_learn_parm {
   double weak_weight;
   double robust_cent;
   double j;
+  int isInitByBinSVM;
 
   double gram_regularization;
 } STRUCT_LEARN_PARM;
