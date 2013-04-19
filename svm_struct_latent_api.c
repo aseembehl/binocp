@@ -379,6 +379,7 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
 
   if (y.label == 0){
       h.best_bb = -1;
+      h.phi_h_i = NULL;
   }
   else{
       fvecs = readFeatures(x.file_name, x.n_candidates);
