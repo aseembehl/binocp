@@ -147,19 +147,15 @@ SAMPLE read_struct_test_examples(char *file, STRUCT_LEARN_PARM *sparm) {
         fscanf(fp,"%d",&sample.examples[i].y.label);
         fscanf(fp,"%d",&sample.examples[i].x.n_candidates);
 
-        if(sample.examples[i].y.label == 0){
-            sample.n_neg++;
-            sample.examples[i].x.example_cost = 1.0;
-        }
-        else {
-            sample.n_pos++;
-        }
-    }
+        sample.examples[i].x.example_cost = 1.0;
+        sample.examples[i].y.label == 1;
 
-    for (i = 0; i < sample.n; i++)    {
-        if(sample.examples[i].y.label == 1){
-            sample.examples[i].x.example_cost = sparm->weak_weight*((double)sample.n_neg)/((double) sample.n_pos);
+        sample.examples[i].x.areaRatios = (int *) malloc(sample.examples[i].x.n_candidates*sizeof(int));
+        if(!sample.examples[i].x.areaRatios) die("Memory error.");
+        for(j = 0; j < sample.examples[i].x.n_candidates; j++){
+            sample.examples[i].x.areaRatios[j] = 100;
         }
+        
     }
 
     return(sample);

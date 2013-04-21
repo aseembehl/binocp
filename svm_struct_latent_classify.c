@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
   printf("Average loss on test set: %.4f\n", avgloss/testsample.n);
   printf("Zero/one error on test set: %.4f\n", 1.0 - ((float) correct)/testsample.n);
 
-  free_struct_sample(testsample);
+  //aseem free_struct_sample(testsample);
   free_struct_model(model,&sparm);
 
   return(0);
