@@ -950,13 +950,18 @@ int main(int argc, char* argv[]) {
 			stop_crit = 0;
 		if(!latent_update)
 			stop_crit = 0;
+    if(outer_iter <= sparm.min_cccp_iter){
+      stop_crit = 0;
+    }
   
     /* impute latent variable using updated weight vector */
 		if(nValid) {
     	for (i=0;i<m;i++) {
-      	free_latent_var(ex[i].h);
-      	ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm, outer_iter);
-    	}
+        if(!stop_crit){
+      	 free_latent_var(ex[i].h);
+      	 ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm, outer_iter);
+    	  }
+      }
 			latent_update++;
 		}
 
@@ -1046,6 +1051,13 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 
 	struct_parm->gram_regularization = 1E-6;
   struct_parm->custom_argc=0;
+  struct_parm->min_cccp_iter=8;
+  struct_parm->min_area_ratios[0] = 70; 
+  struct_parm->min_area_ratios[1] = 70; 
+  struct_parm->min_area_ratios[2] = 65; 
+  struct_parm->min_area_ratios[3] = 60; 
+  struct_parm->min_area_ratios[4] = 55; 
+  struct_parm->min_area_ratios[5] = 50;
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {

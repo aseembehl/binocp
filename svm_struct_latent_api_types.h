@@ -105,7 +105,10 @@ typedef struct struct_learn_parm {
   double j;
   int isInitByBinSVM;
   int initIter;
-
+  int min_cccp_iter;
   double gram_regularization;
+  int min_area_ratios[6];
+
+  
 } STRUCT_LEARN_PARM;
 
