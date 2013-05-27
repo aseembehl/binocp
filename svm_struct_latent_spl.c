@@ -323,6 +323,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 	while((iter<MAX_ITER)) {
 		if(value<=(threshold+epsilon)){
         for (i=0;i<m;i++) {
+        	free_latent_var(hbars[i]);
             mine_negative_latent_variables(ex[i].x, &hbars[i], sm);
 
             if(i % 500 == 0){
@@ -495,6 +496,10 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 	free(cur_slack);
 	free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
+  
+for (i=0;i<m;i++) {
+        free_latent_var(hbars[i]);
+      } 
 
   free(hbars);
 
