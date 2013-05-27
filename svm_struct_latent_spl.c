@@ -252,7 +252,7 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 }
 
 double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
-															STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, LATENT_VAR *hbars) {
+															STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples) {
   long i,j;
   double *alpha;
   DOC **dXc; /* constraint matrix */
@@ -311,10 +311,32 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
   printf("Running structural SVM solver: "); fflush(stdout); 
 
+  LATENT_VAR *hbars = malloc(m*sizeof(LATENT_VAR));
+  for (i=0;i<m;i++) {
+      mine_negative_latent_variables(ex[i].x, &hbars[i], sm);
+      if(i % 500 == 0){
+          printf("%ld negative annnotation reset\n", i); fflush(stdout);
+      } 
+  }
 	new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples, hbars);
  	value = margin - sprod_ns(w, new_constraint);
-	while((value>threshold+epsilon)&&(iter<MAX_ITER)) {
-		iter+=1;
+	while((iter<MAX_ITER)) {
+		if(value<=(threshold+epsilon)){
+        for (i=0;i<m;i++) {
+            mine_negative_latent_variables(ex[i].x, &hbars[i], sm);
+
+            if(i % 500 == 0){
+                printf("%ld  negative annnotation reset\n", i); fflush(stdout);
+            } 
+        }
+        new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples, hbars);
+        value = margin - sprod_ns(w, new_constraint);
+        if(value<=(threshold+epsilon)){
+            break;
+        }
+    }
+
+    iter+=1;
 		size_active+=1;
 
 		printf("."); fflush(stdout); 
@@ -474,6 +496,8 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 	free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
 
+  free(hbars);
+
   return(primal_obj);
 }
 
@@ -515,7 +539,7 @@ int bb_score_comp(const void *a, const void *b) {
 }
 
 int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
-													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, LATENT_VAR *hbars) {
+													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
 
 	long i, j;
 
@@ -526,7 +550,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 		return (m);
 	}
 
-	sortStruct *slack = (sortStruct *) malloc(m*sizeof(sortStruct));
+	/*sortStruct *slack = (sortStruct *) malloc(m*sizeof(sortStruct));
 	LABEL ybar;
 	//LATENT_VAR hbar;
 	SVECTOR *f, *fy, *fybar;
@@ -574,13 +598,13 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 		nValid++;
 	}
 
-	free(slack);
-
+	free(slack);*/
+  int nValid = 0;
 	return nValid;
 }
 
 double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
-                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, LATENT_VAR *hbars) {
+                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
 
 	long i;
 	int iter = 0, converged, nValid;
@@ -591,25 +615,25 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 
 	for (i=0;i<sm->sizePsi+1;i++)
 		best_w[i] = w[i];
-	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, hbars);
-	last_relaxed_primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples, hbars);
+	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight);
+	/*last_relaxed_primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples, hbars);
 	if(nValid < m)
-		last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
+		last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);*/
 
 	for (i=0;i<m;i++) {
 		prev_valid_examples[i] = 0;
 	}
 
 	for (iter=0;;iter++) {
-		nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, hbars);
+		nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight);
 		printf("ACS Iteration %d: number of examples = %d\n",iter,nValid); fflush(stdout);
 		converged = check_acs_convergence(prev_valid_examples,valid_examples,m);
 		if(converged)
 			break;
 		for (i=0;i<sm->sizePsi+1;i++)
 			w[i] = 0.0;
-		relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples, hbars);
-		if(nValid < m)
+		relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
+		/*if(nValid < m)
 			relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 		decrement = last_relaxed_primal_obj-relaxed_primal_obj;
     printf("acs relaxed primal objective: %.4f\n", relaxed_primal_obj);
@@ -627,7 +651,10 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		if (decrement <= C*epsilon) {
 			break;
 		}
-		last_relaxed_primal_obj = relaxed_primal_obj;
+		last_relaxed_primal_obj = relaxed_primal_obj;*/
+    for (i=0;i<sm->sizePsi+1;i++) {
+        best_w[i] = w[i];
+      }
 		for (i=0;i<m;i++) {
 			prev_valid_examples[i] = valid_examples[i];
 		}
@@ -643,13 +670,13 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		}
 	}
 
-	double primal_obj;
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, prev_valid_examples, hbars);
+	//double primal_obj;
+	//primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, prev_valid_examples, hbars);
 	
 	free(prev_valid_examples);
 	free(best_w);
 
-	return(primal_obj);
+	return(relaxed_primal_obj);
 }
 
 
@@ -743,11 +770,11 @@ double negative_mine_loop(double *w, long m, int MAX_ITER, double C, double epsi
           mine_negative_latent_variables(ex[i].x, &hbars[i], sm);
 
           if(i % 500 == 0){
-              printf("%ld Postive image\n", i); fflush(stdout);
+              printf("%d Postive image\n", i); fflush(stdout);
           } 
       }
           
-      primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples, spl_weight, hbars);
+      primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples, spl_weight);
 
       decrement = last_primal_obj - primal_obj;
       last_primal_obj = primal_obj;
@@ -924,7 +951,8 @@ int main(int argc, char* argv[]) {
     /* cutting plane algorithm */
     //primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
 		/* solve biconvex self-paced learning problem */
-		primal_obj = negative_mine_loop(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
+		//primal_obj = negative_mine_loop(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
+    primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
 
 		int nValid = 0;
 		for (i=0;i<m;i++) {
@@ -950,9 +978,9 @@ int main(int argc, char* argv[]) {
 			stop_crit = 0;
 		if(!latent_update)
 			stop_crit = 0;
-    if(outer_iter <= sparm.min_cccp_iter){
+    /*if(outer_iter <= sparm.min_cccp_iter){
       stop_crit = 0;
-    }
+    }*/
   
     /* impute latent variable using updated weight vector */
 		if(nValid) {
