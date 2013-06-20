@@ -496,6 +496,10 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 	free(cur_slack);
 	free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
+  
+for (i=0;i<m;i++) {	
+    free_latent_var(hbars[i]);
+} 
 
   for (i=0;i<m;i++) { 
      free_latent_var(hbars[i]);
