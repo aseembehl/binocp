@@ -323,6 +323,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 	while((iter<MAX_ITER)) {
 		if(value<=(threshold+epsilon)){
         for (i=0;i<m;i++) {
+            free_latent_var(hbars[i]);
             mine_negative_latent_variables(ex[i].x, &hbars[i], sm);
 
             if(i % 500 == 0){
@@ -495,6 +496,10 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 	free(cur_slack);
 	free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
+
+  for (i=0;i<m;i++) { 
+     free_latent_var(hbars[i]);
+  } 
 
   free(hbars);
 
@@ -934,8 +939,23 @@ int main(int argc, char* argv[]) {
      
   /* outer loop: latent variable imputation */
   //outer_iter = 0;
-  last_primal_obj = DBL_MAX;
-  decrement = 0;
+  LATENT_VAR *hbars;
+  if (sparm.isInitByBinSVM){
+    update_valid_examples(w, m, C, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
+    hbars = malloc(m*sizeof(LATENT_VAR));
+    for (i=0;i<m;i++) {
+        mine_negative_latent_variables(ex[i].x, &hbars[i], &sm);
+    }
+    last_primal_obj = current_obj_val(ex, fycache, m, &sm, &sparm, C, valid_examples, hbars);
+    for (i=0;i<m;i++) {
+      free_latent_var(hbars[i]);
+    }
+    free(hbars);
+  }
+  else{
+    last_primal_obj = DBL_MAX;
+  }
+    decrement = 0;
 
   /* errors for validation set */
 

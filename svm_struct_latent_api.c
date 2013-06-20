@@ -112,6 +112,10 @@ SVECTOR** readFeatures(char *feature_file, int n_fvecs) {
 
         free(line);
         line = NULL;
+        if (i==n_fvecs){
+            break;
+        }
+
    }
    fclose(fp);
    return fvecs;
@@ -305,8 +309,8 @@ void mine_negative_latent_variables(PATTERN x, LATENT_VAR *hbar, STRUCTMODEL *sm
 
     SVECTOR **fvecs = NULL;
     
-    fvecs = readFeatures(x.file_name, x.n_candidates);
-    for(j = 0; j < x.n_candidates; j++){
+    fvecs = readFeatures(x.file_name, 50);
+    for(j = 0; j < 50; j++){
         score = sprod_ns(sm->w, fvecs[j]);      
         if(score > maxScore){
             maxScore = score;
@@ -314,7 +318,7 @@ void mine_negative_latent_variables(PATTERN x, LATENT_VAR *hbar, STRUCTMODEL *sm
         }   
     }
     hbar->phi_h_i = copy_svector(fvecs[hbar->best_bb]);
-    for(j =0; j < x.n_candidates; j++){
+    for(j =0; j < 50; j++){
         free_svector(fvecs[j]);
     }
     free(fvecs);
