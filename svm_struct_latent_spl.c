@@ -182,6 +182,7 @@ int main(int argc, char* argv[]) {
   srand(sparm.seed);
   while ((outer_iter<2)||((!stop_crit)&&(outer_iter<MAX_OUTER_ITER))) { 
     printf("OUTER ITER %d\n", outer_iter); 
+    fflush(stdout);
 
     //solve svm. Compute primal objective
     lambda = 1/(double) C;
