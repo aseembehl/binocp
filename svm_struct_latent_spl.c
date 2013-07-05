@@ -153,8 +153,6 @@ int main(int argc, char* argv[]) {
     init_latent_variables(&sample,&learn_parm,&sm,&sparm);
   }
      
-  /* outer loop: latent variable imputation */
-  LATENT_VAR *hbars;
   if (sparm.isInitByBinSVM){
     // add code to compute objective value while resuming
   }
@@ -176,7 +174,7 @@ int main(int argc, char* argv[]) {
   SVECTOR **fvecs = NULL;
 
   int n_pos_sample = 1;
-  int n_neg_sample = 2;
+  int n_neg_sample = 20;
   int example_per_iter = n_pos_sample + 50*n_neg_sample;
   double norm2;
   double scaleFactor;
@@ -262,6 +260,10 @@ int main(int argc, char* argv[]) {
               if (c_loss < 0.0) c_loss = 0.0;
               primal_obj += c_loss/n_examples;
           }
+          for (j = 0; j < ex[i].x.n_candidates; j++){
+              free_svector(fvecs[j]);
+          }
+          free(fvecs);
       }      
     }
     
@@ -329,7 +331,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   long i;
 
   /* set default */
-  learn_parm->maxiter=100;
+  learn_parm->maxiter=10;
   learn_parm->svm_c=100.0;
   learn_parm->eps=0.001;
   struct_parm->seed=1;
