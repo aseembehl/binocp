@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
     lambda = 1/(double) C;
     for (iterations = 0; iterations < MAX_ITER; iterations++) {
         if(iterations % 10 == 0){
-            printf("%ld Pegasos iteration\n", iterations); fflush(stdout);
+            printf("%d Pegasos iteration\n", iterations); fflush(stdout);
         }
         // learning rate
         eta = 1 / (lambda * (iterations+2)); 
@@ -247,14 +247,18 @@ int main(int argc, char* argv[]) {
         }
     }
     norm2 = sprod_nn(w, w, sm.sizePsi);
-    primal_obj = norm2 * lambda / 2.0;
+    //primal_obj = norm2 * lambda / 2.0;
+    primal_obj = norm2 / 2.0;
     int n_examples = 50*sample.n_neg + sample.n_pos;
     for (i=0; i < m; i++) {
+      if(i % 200 == 0){
+            printf("%ld Loss computation \n", i); fflush(stdout);
+      }
       if(ex[i].y.label == 1){
           score = sprod_ns(w, ex[i].h.phi_h_i);
           c_loss = 1 - ex[i].y.label*score;
           if (c_loss < 0.0) c_loss = 0.0;
-          primal_obj += c_loss/n_examples;
+          primal_obj += C*c_loss/n_examples;
       }
       else{
           fvecs = readFeatures(ex[i].x.file_name, ex[i].x.n_candidates);
@@ -262,7 +266,7 @@ int main(int argc, char* argv[]) {
               score = sprod_ns(w, fvecs[j]);
               c_loss = 1 - ex[i].y.label*score;
               if (c_loss < 0.0) c_loss = 0.0;
-              primal_obj += c_loss/n_examples;
+              primal_obj += C*c_loss/n_examples;
           }
           for (j = 0; j < ex[i].x.n_candidates; j++){
               free_svector(fvecs[j]);
