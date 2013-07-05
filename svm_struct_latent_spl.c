@@ -187,6 +187,9 @@ int main(int argc, char* argv[]) {
     //solve svm. Compute primal objective
     lambda = 1/(double) C;
     for (iterations = 0; iterations < MAX_ITER; iterations++) {
+        if(iterations % 10 == 0){
+            printf("%ld Pegasos iteration\n", iterations); fflush(stdout);
+        }
         // learning rate
         eta = 1 / (lambda * (iterations+2)); 
 

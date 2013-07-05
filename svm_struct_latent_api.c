@@ -254,7 +254,7 @@ void init_latent_variables(SAMPLE *sample, LEARN_PARM *lparm, STRUCTMODEL *sm, S
                 free_svector(fvecs[j]);
             }
             free(fvecs);
-            if(i % 15 == 0){
+            if(i % 50 == 0){
                 printf("%ld Postive image\n", i); fflush(stdout);
             }
         } 
