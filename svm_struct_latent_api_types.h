@@ -65,6 +65,8 @@ typedef struct sample {
   long n_pos;
   long n_neg;
   EXAMPLE *examples;
+  int *pos_idx;
+  int *neg_idx;
 } SAMPLE;
 
 

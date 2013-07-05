@@ -18,6 +18,7 @@
 #include "svm_struct_latent_api_types.h"
 #include <float.h>
 
+SVECTOR** readFeatures(char *feature_file, int n_fvecs);
 SAMPLE read_struct_test_examples(char *file, STRUCT_LEARN_PARM *sparm);
 SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm);
 void init_struct_model(SAMPLE sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, LEARN_PARM *lparm, KERNEL_PARM *kparm);

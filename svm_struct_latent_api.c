@@ -54,13 +54,7 @@ SVECTOR** readFeatures(char *feature_file, int n_fvecs) {
     int i = 0;
     int j = 0;
 
-    /*int offset = 0;
-    int wnum;
-    float weight;
-    char *data;*/
-
     while( getline(&line,&len,fp) != -1) {
-        //data = line;
         ln = strlen(line) - 1;
         if (line[ln] == '\n')
             line[ln] = '\0';
@@ -68,17 +62,7 @@ SVECTOR** readFeatures(char *feature_file, int n_fvecs) {
         fvec_length = 0;
         fvec_buffer_length = 10000;
         words = (WORD *) malloc(fvec_buffer_length*sizeof(WORD));
-        /*while(2 == sscanf(data, " %d:%f%n", &wnum, &weight, &offset)){
-            fvec_length++;
-            if(fvec_length == fvec_buffer_length){
-                fvec_buffer_length = fvec_buffer_length*1.5;
-                words = (WORD *) realloc(words, fvec_buffer_length*sizeof(WORD));
-            }            
-            if(!words) die("Memory error.");
-            words[fvec_length-1].wnum = wnum;
-            words[fvec_length-1].weight = weight; 
-            data += offset;
-        }*/
+
         for(pair = strtok_r(line, " ", &brkt); pair; pair = strtok_r(NULL, " ", &brkt)){
             fvec_length++;
             if(fvec_length == fvec_buffer_length){
@@ -190,29 +174,29 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
     sample.examples = (EXAMPLE *) malloc(sample.n*sizeof(EXAMPLE));
     if(!sample.examples) die("Memory error.");
 
+    sample.pos_idx = NULL;
+    sample.neg_idx = NULL;
     for(i = 0; i < sample.n; i++){
         fscanf(fp,"%s",sample.examples[i].x.file_name);
         fscanf(fp,"%d",&sample.examples[i].y.label);
         fscanf(fp,"%d",&sample.examples[i].x.n_candidates);
 
-        if(sample.examples[i].y.label == 0){
+        if(sample.examples[i].y.label == 0){               
             sample.n_neg++;
-            sample.examples[i].x.example_cost = 1.0;
+            sample.neg_idx = (int *)realloc(sample.neg_idx, sample.n_neg*sizeof(int));
+            sample.neg_idx[sample.n_neg-1] = i;   
+            sample.examples[i].y.label = -1;             
         }
-        else {
-            sample.n_pos++;
+        else {      
+            sample.n_pos++;      
+            sample.pos_idx = (int *)realloc(sample.pos_idx, sample.n_pos*sizeof(int));
+            sample.pos_idx[sample.n_pos-1] = i;  
             sample.examples[i].x.areaRatios = (int *) malloc(sample.examples[i].x.n_candidates*sizeof(int));
             if(!sample.examples[i].x.areaRatios) die("Memory error.");
 
             for(j = 0; j < sample.examples[i].x.n_candidates; j++){
                 fscanf(fp, "%d", &sample.examples[i].x.areaRatios[j]);
             }
-        }
-    }
-
-    for (i = 0; i < sample.n; i++)    {
-        if(sample.examples[i].y.label == 1){
-            sample.examples[i].x.example_cost = sparm->weak_weight*((double)sample.n_neg)/((double) sample.n_pos);
         }
     }
 
@@ -226,7 +210,7 @@ void init_struct_model(SAMPLE sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm,
   variables in sm here. 
 */
 
-	sm->n = sample.n;
+	  sm->n = sample.n;
     sm->sizePsi = sparm->feature_size;
 }
 
@@ -324,46 +308,6 @@ void mine_negative_latent_variables(PATTERN x, LATENT_VAR *hbar, STRUCTMODEL *sm
     free(fvecs);
 }
 
-void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
-/*
-  Finds the most violated constraint (loss-augmented inference), i.e.,
-  computing argmax_{(ybar,hbar)} [<w,psi(x,ybar,hbar)> + loss(y,ybar,hbar)].
-  The output (ybar,hbar) are stored at location pointed by 
-  pointers *ybar and *hbar. 
-*/
-
-  double maxNegScore, maxPosScore;
-
-  if(y.label == 0){
-      // find max negative score, i.e for ybar.label = 0
-      maxNegScore = 0;
-
-      // find max positive score, i.e for ybar.label = 1
-      maxPosScore = 1 + sprod_ns(sm->w, hbar->phi_h_i);
-
-      if (maxPosScore > maxNegScore){
-          ybar->label = 1;
-      }else{
-          ybar->label = 0;
-      }
-  }
-  else if(y.label == 1){
-      // find max negative score, i.e for ybar.label = 0
-      maxNegScore = 1;
-
-      // find max positive score, i.e for ybar.label = 1
-      maxPosScore = sprod_ns(sm->w, hbar->phi_h_i);
-
-      if (maxPosScore > maxNegScore){
-          ybar->label = 1;
-      }else{
-          ybar->label = 0;
-      }
-  }
-
-	return;
-}
-
 LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int outer_iter) {
 /*
   Complete the latent variable h for labeled examples, i.e.,
@@ -377,7 +321,7 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
 
   SVECTOR **fvecs;
 
-  if (y.label == 0){
+  if (y.label == -1){
       h.best_bb = -1;
       h.phi_h_i = NULL;
   }
@@ -556,8 +500,6 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
   sparm->feature_size = 90112;
   sparm->rng_seed = 0;
   sparm->weak_weight = 1e0;
-  sparm->robust_cent = 0;
-  sparm->j = 1e0;
   
   for (i=0;(i<sparm->custom_argc)&&((sparm->custom_argv[i])[0]=='-');i++) {
     switch ((sparm->custom_argv[i])[2]) {
@@ -565,8 +507,6 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
       case 'f': i++; sparm->feature_size = atoi(sparm->custom_argv[i]); break;
       case 'r': i++; sparm->rng_seed = atoi(sparm->custom_argv[i]); break;
       case 'w': i++; sparm->weak_weight = atof(sparm->custom_argv[i]); break;
-      case 'p': i++; sparm->robust_cent = atof(sparm->custom_argv[i]); break;
-      case 'j': i++; sparm->j = atof(sparm->custom_argv[i]); break;
       default: printf("\nUnrecognized option %s!\n\n", sparm->custom_argv[i]); exit(0);
     }
   }
