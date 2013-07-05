@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
   double norm2;
   double scaleFactor;
 
-  srand(500);
+  srand(sparm.seed);
   while ((outer_iter<2)||((!stop_crit)&&(outer_iter<MAX_OUTER_ITER))) { 
     printf("OUTER ITER %d\n", outer_iter); 
 
@@ -332,6 +332,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   learn_parm->maxiter=100;
   learn_parm->svm_c=100.0;
   learn_parm->eps=0.001;
+  struct_parm->seed=1;
 
   struct_parm->custom_argc=0;
   struct_parm->min_cccp_iter=8;
@@ -347,6 +348,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
     case 'c': i++; learn_parm->svm_c=atof(argv[i]); break;
     case 'e': i++; learn_parm->eps=atof(argv[i]); break;
     case 'n': i++; learn_parm->maxiter=atol(argv[i]); break;
+    case 's': i++; struct_parm->seed=atoi(argv[i]); break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);
       exit(0);

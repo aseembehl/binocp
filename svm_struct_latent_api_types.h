@@ -102,6 +102,7 @@ typedef struct struct_learn_parm {
   /* add your own variables */
   long feature_size;
   int rng_seed;
+  int seed;
   double weak_weight;
   double robust_cent;
   double j;
