@@ -70,9 +70,9 @@ double* add_list_nn(SVECTOR *a, long totwords)
     return(sum);
 }
 
-int main(int argc, char* argv[]) {
+/*int main(int argc, char* argv[]) {
 
-  double *w; /* weight vector */
+  double *w; // weight vector 
   int outer_iter;
   long m, i, j, k;
   double C_pos, C_neg, epsilon;
@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
   char init_modelfile[1024];
   char objfile[1024];
   int MAX_ITER;
-  /* new struct variables */
+  // new struct variables 
   EXAMPLE *ex;
 	SAMPLE alldata;
   SAMPLE sample;
@@ -96,22 +96,22 @@ int main(int argc, char* argv[]) {
   double stop_crit; 
 	char itermodelfile[2000];
 	
-  /* read input parameters */
+  // read input parameters 
 	my_read_input_parameters(argc, argv, trainfile, modelfile, init_modelfile, objfile, &learn_parm, &sparm); 
 
   epsilon = learn_parm.eps;
   C_neg = learn_parm.svm_c;
   MAX_ITER = learn_parm.maxiter;
 
-  /* read in examples */
+  // read in examples 
   alldata = read_struct_examples(trainfile,&sparm);
-  int ntrain = (int) round(1.0*alldata.n); /* no validation set */
+  int ntrain = (int) round(1.0*alldata.n); // no validation set 
 	
 	sample = alldata;
   ex = sample.examples;
   m = sample.n;
   
-  /* initialization */
+  // initialization 
   init_struct_model(alldata,&sm,&sparm,&learn_parm,&kernel_parm); 
 
   w = create_nvector(sm.sizePsi);
@@ -124,16 +124,16 @@ int main(int argc, char* argv[]) {
       w[i] = sm.w[i]; 
   }// added by aseem
 
-  sm.w = w; /* establish link to w, as long as w does not change pointer */
+  sm.w = w; // establish link to w, as long as w does not change pointer 
 
-  /* some training information */
+  // some training information 
   printf("C: %.8g\n", C_neg);
   printf("epsilon: %.8g\n", epsilon);
   printf("sample.n: %ld\n", sample.n); 
   printf("sm.sizePsi: %ld\n", sm.sizePsi); fflush(stdout);
   
 
-  /* impute latent variable for first iteration */
+  // impute latent variable for first iteration 
   //init_latent_variables(&sample,&learn_parm,&sm,&sparm);
 
   // Impute latent variable using updated weight vector
@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
   }
   decrement = 0;
 
-	/* initializations */  
+	// initializations
   double lambda_pos, lambda_neg;    
   int iterations = 0;  
   double eta_pos, eta_neg;
@@ -287,7 +287,7 @@ int main(int argc, char* argv[]) {
       }      
     }
     
-    /* compute decrement in objective in this outer iteration */
+    // compute decrement in objective in this outer iteration 
     decrement = last_primal_obj - primal_obj;
     last_primal_obj = primal_obj;
     printf("cccp primal objective: %.4f\n", primal_obj);
@@ -300,7 +300,7 @@ int main(int argc, char* argv[]) {
     
     stop_crit = (decrement<C_neg*epsilon);
   
-    /* impute latent variable using updated weight vector */
+    // impute latent variable using updated weight vector 
 		if(!stop_crit) {
     	for (i=0;i<m;i++) {
         if (ex[i].y.label == 1) {
@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
   } // end outer loop
   
 
-  /* write structural model */
+  // write structural model 
   write_struct_model(modelfile, &sm, &sparm);
   // skip testing for the moment  
   
@@ -330,7 +330,7 @@ int main(int argc, char* argv[]) {
   fprintf(objfl, "%0.7f\n", last_primal_obj);
   fclose(objfl);
 
-  /* free memory */
+  // free memory 
   free_struct_sample(alldata);
 	if(ntrain < alldata.n)
 	{
@@ -341,9 +341,271 @@ int main(int argc, char* argv[]) {
    
   return(0); 
   
+}*/
+
+  int main(int argc, char* argv[]) {
+
+  double *w; /* weight vector */
+  double *w_update;
+  int outer_iter;
+  long m, i, j, k;
+  double C, epsilon;
+  LEARN_PARM learn_parm;
+  KERNEL_PARM kernel_parm;
+  char trainfile[1024];
+  char modelfile[1024];
+  char init_modelfile[1024];
+  char objfile[1024];
+  int MAX_ITER;
+  /* new struct variables */
+  EXAMPLE *ex;
+  SAMPLE alldata;
+  SAMPLE sample;
+  SAMPLE val;
+  STRUCT_LEARN_PARM sparm;
+  STRUCTMODEL sm;
+  
+  double decrement;
+  double primal_obj, last_primal_obj;
+  double stop_crit; 
+  char itermodelfile[2000];
+  
+  /* read input parameters */
+  my_read_input_parameters(argc, argv, trainfile, modelfile, init_modelfile, objfile, &learn_parm, &sparm); 
+
+  epsilon = learn_parm.eps;
+  C = learn_parm.svm_c;
+  MAX_ITER = learn_parm.maxiter;
+
+  /* read in examples */
+  alldata = read_struct_examples(trainfile,&sparm);
+  int ntrain = (int) round(1.0*alldata.n); /* no validation set */
+  
+  sample = alldata;
+  ex = sample.examples;
+  m = sample.n;
+  
+  /* initialization */
+  init_struct_model(alldata,&sm,&sparm,&learn_parm,&kernel_parm); 
+
+  w = create_nvector(sm.sizePsi);
+  clear_nvector(w, sm.sizePsi);
+
+  w_update = create_nvector(sm.sizePsi);
+  clear_nvector(w_update, sm.sizePsi);
+  
+   // added by aseem
+  if (sparm.isInitByBinSVM){
+    sm = read_struct_model(init_modelfile, &sparm);
+    for (i=0;i<sm.sizePsi+1;i++)
+      w[i] = sm.w[i]; 
+  }// added by aseem
+
+  sm.w = w; /* establish link to w, as long as w does not change pointer */
+
+  /* some training information */
+  printf("C: %.8g\n", C);
+  printf("epsilon: %.8g\n", epsilon);
+  printf("sample.n: %ld\n", sample.n); 
+  printf("sm.sizePsi: %ld\n", sm.sizePsi); fflush(stdout);
+  
+
+  /* impute latent variable for first iteration */
+  //init_latent_variables(&sample,&learn_parm,&sm,&sparm);
+
+  // Impute latent variable using updated weight vector
+  outer_iter = 0;
+  if (sparm.isInitByBinSVM){
+    for (i=0;i<m;i++) {
+        free_latent_var(ex[i].h);
+        ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm, sparm.initIter);
+    }
+    outer_iter = 1 + sparm.initIter;
+  }   
+  else{
+    init_latent_variables(&sample,&learn_parm,&sm,&sparm);
+  }
+     
+  if (sparm.isInitByBinSVM){
+    // add code to compute objective value while resuming
+  }
+  else{
+    last_primal_obj = DBL_MAX;
+  }
+  decrement = 0;
+
+  /* initializations */  
+  double lambda;    
+  int iterations = 0;  
+  double eta;
+  int r;
+
+  double score;
+  int pos_idx;
+  int neg_idx;
+  double c_loss;
+  SVECTOR **fvecs = NULL;
+
+  int n_pos_sample = 1;
+  int n_neg_sample = 20;
+  int example_per_iter = n_pos_sample + 50*n_neg_sample;
+  double norm2;
+  double scaleFactor;
+
+  srand(sparm.seed);
+  while ((outer_iter<2)||((!stop_crit)&&(outer_iter<MAX_OUTER_ITER))) { 
+
+    printf("OUTER ITER %d\n", outer_iter); 
+    fflush(stdout);
+
+    clear_nvector(w, sm.sizePsi);
+
+    //solve svm. Compute primal objective
+    lambda = 1/(double) C;
+    for (iterations = 0; iterations < MAX_ITER; iterations++) {
+        if(iterations % 25 == 0){
+            printf("%d Pegasos iteration\n", iterations); fflush(stdout);
+        }
+        // learning rate
+        eta = 1 / (lambda * (iterations+2)); 
+
+        // pick a random positive sample
+        r = ((int)rand()) % sample.n_pos;
+        pos_idx = sample.pos_idx[r];
+        score = sprod_ns(w, ex[pos_idx].h.phi_h_i);
+        c_loss = 1 - ex[pos_idx].y.label*score;
+        if (c_loss < 0.0){
+          c_loss = 0.0;
+        } 
+        if (c_loss > 0.0) {
+            scaleFactor = eta*ex[pos_idx].y.label/example_per_iter;
+            add_vector_ns(w_update, ex[pos_idx].h.phi_h_i, scaleFactor);
+        }
+
+        // pick n_neg_sample random negative sample
+        for ( i = 0; i < n_neg_sample; i++){          
+          r = ((int)rand()) % sample.n_neg;
+          neg_idx = sample.neg_idx[r];
+          fvecs = readFeatures(ex[neg_idx].x.file_name, ex[neg_idx].x.n_candidates);
+          for (j = 0; j < ex[neg_idx].x.n_candidates; j++){
+            score = sprod_ns(w, fvecs[j]);
+            c_loss = 1 - ex[neg_idx].y.label*score;
+            if (c_loss < 0.0){
+                c_loss = 0.0;
+            } 
+            if (c_loss > 0.0) {
+                scaleFactor = eta*ex[neg_idx].y.label/example_per_iter;
+                add_vector_ns(w_update, fvecs[j], scaleFactor);
+            }
+          }
+          for (j = 0; j < ex[neg_idx].x.n_candidates; j++){
+              free_svector(fvecs[j]);
+          }
+          free(fvecs);
+        } 
+        
+
+         // scale w 
+        scaleFactor = 1.0 - eta*lambda;
+        for(k = 1; k < sm.sizePsi+1; k++){
+            w[k] = scaleFactor*w[k];
+        }
+
+        add_vector_nn(w, w_update, sm.sizePsi, 1);
+        clear_nvector(w_update, sm.sizePsi);
+
+        norm2 = sprod_nn(w, w, sm.sizePsi);
+        if (norm2 > 1.0/lambda) {
+          scaleFactor = sqrt(1.0/(lambda*norm2));
+          for(k = 1; k < sm.sizePsi+1; k++){
+            w[k] = scaleFactor*w[k];
+          }
+        }
+    }
+    norm2 = sprod_nn(w, w, sm.sizePsi);
+    //primal_obj = norm2 * lambda / 2.0;
+    primal_obj = norm2 / 2.0;
+    int n_examples = 50*sample.n_neg + sample.n_pos;
+    for (i=0; i < m; i++) {
+      if(i % 500 == 0){
+            printf("%ld Loss computation \n", i); fflush(stdout);
+      }
+      if(ex[i].y.label == 1){
+          score = sprod_ns(w, ex[i].h.phi_h_i);
+          c_loss = 1 - ex[i].y.label*score;
+          if (c_loss < 0.0) c_loss = 0.0;
+          primal_obj += C*c_loss/n_examples;
+      }
+      else{
+          fvecs = readFeatures(ex[i].x.file_name, ex[i].x.n_candidates);
+          for (j = 0; j < ex[i].x.n_candidates; j++){
+              score = sprod_ns(w, fvecs[j]);
+              c_loss = 1 - ex[i].y.label*score;
+              if (c_loss < 0.0) c_loss = 0.0;
+              primal_obj += C*c_loss/n_examples;
+          }
+          for (j = 0; j < ex[i].x.n_candidates; j++){
+              free_svector(fvecs[j]);
+          }
+          free(fvecs);
+      }      
+    }
+    
+    /* compute decrement in objective in this outer iteration */
+    decrement = last_primal_obj - primal_obj;
+    last_primal_obj = primal_obj;
+    printf("cccp primal objective: %.4f\n", primal_obj);
+    if (outer_iter) {
+      printf("cccp decrement: %.4f\n", decrement); fflush(stdout);
+    }
+    else {
+      printf("cccp decrement: N/A\n"); fflush(stdout);
+    }
+    
+    stop_crit = (decrement<C*epsilon);
+  
+    /* impute latent variable using updated weight vector */
+    if(!stop_crit) {
+      for (i=0;i<m;i++) {
+        if (ex[i].y.label == 1) {
+          free_latent_var(ex[i].h);
+          ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm, outer_iter);
+        }
+      }
+    }
+
+    sprintf(itermodelfile,"%s.%04d",modelfile,outer_iter);
+    write_struct_model(itermodelfile, &sm, &sparm);
+
+    outer_iter++;  
+  } // end outer loop
+  
+
+  /* write structural model */
+  write_struct_model(modelfile, &sm, &sparm);
+  // skip testing for the moment  
+  
+  // write objective function value to file 
+  FILE *objfl = fopen(objfile, "w");
+  if (objfl==NULL) {
+    printf("Cannot open model file %s for output!", objfile);
+    exit(1);
+  }
+  fprintf(objfl, "%0.7f\n", last_primal_obj);
+  fclose(objfl);
+
+  /* free memory */
+  free_struct_sample(alldata);
+  if(ntrain < alldata.n)
+  {
+    free(sample.examples);
+    free(val.examples);
+  }
+  free_struct_model(sm, &sparm);
+   
+  return(0); 
+  
 }
-
-
 
 void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *init_modelfile, char *objfile, 
 			      LEARN_PARM *learn_parm, STRUCT_LEARN_PARM *struct_parm) {
