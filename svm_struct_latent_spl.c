@@ -73,10 +73,9 @@ double* add_list_nn(SVECTOR *a, long totwords)
 int main(int argc, char* argv[]) {
 
   double *w; /* weight vector */
-  double *w_update;
   int outer_iter;
   long m, i, j, k;
-  double C, epsilon;
+  double C_pos, C_neg, epsilon;
   LEARN_PARM learn_parm;
   KERNEL_PARM kernel_parm;
   char trainfile[1024];
@@ -101,7 +100,7 @@ int main(int argc, char* argv[]) {
 	my_read_input_parameters(argc, argv, trainfile, modelfile, init_modelfile, objfile, &learn_parm, &sparm); 
 
   epsilon = learn_parm.eps;
-  C = learn_parm.svm_c;
+  C_neg = learn_parm.svm_c;
   MAX_ITER = learn_parm.maxiter;
 
   /* read in examples */
@@ -117,9 +116,6 @@ int main(int argc, char* argv[]) {
 
   w = create_nvector(sm.sizePsi);
   clear_nvector(w, sm.sizePsi);
-
-  w_update = create_nvector(sm.sizePsi);
-  clear_nvector(w_update, sm.sizePsi);
   
    // added by aseem
   if (sparm.isInitByBinSVM){
@@ -131,7 +127,7 @@ int main(int argc, char* argv[]) {
   sm.w = w; /* establish link to w, as long as w does not change pointer */
 
   /* some training information */
-  printf("C: %.8g\n", C);
+  printf("C: %.8g\n", C_neg);
   printf("epsilon: %.8g\n", epsilon);
   printf("sample.n: %ld\n", sample.n); 
   printf("sm.sizePsi: %ld\n", sm.sizePsi); fflush(stdout);
@@ -162,9 +158,9 @@ int main(int argc, char* argv[]) {
   decrement = 0;
 
 	/* initializations */  
-  double lambda;    
+  double lambda_pos, lambda_neg;    
   int iterations = 0;  
-  double eta;
+  double eta_pos, eta_neg;
   int r;
 
   double score;
@@ -179,32 +175,52 @@ int main(int argc, char* argv[]) {
   double norm2;
   double scaleFactor;
 
+  C_pos = C_neg*sample.n_neg*50*sparm.weak_weight/sample.n_pos;
+    printf("C: %.8g\n", C_pos); fflush(stdout);
+
   srand(sparm.seed);
   while ((outer_iter<2)||((!stop_crit)&&(outer_iter<MAX_OUTER_ITER))) { 
     printf("OUTER ITER %d\n", outer_iter); 
     fflush(stdout);
 
     //solve svm. Compute primal objective
-    lambda = 1/(double) C;
-    for (iterations = 0; iterations < MAX_ITER; iterations++) {
-        if(iterations % 10 == 0){
+    lambda_pos = 1/(double) C_pos;
+    lambda_neg = 1/(double) C_neg;
+    iterations = 0;
+    while(iterations < MAX_ITER){
+        if(iterations % 1000 == 0){
             printf("%d Pegasos iteration\n", iterations); fflush(stdout);
         }
+
         // learning rate
-        eta = 1 / (lambda * (iterations+2)); 
+        eta_pos = 1 / (lambda_pos * (iterations+2));
 
         // pick a random positive sample
         r = ((int)rand()) % sample.n_pos;
-        pos_idx = sample.pos_idx[r];
+        pos_idx = sample.pos_idx[r]; 
+
         score = sprod_ns(w, ex[pos_idx].h.phi_h_i);
         c_loss = 1 - ex[pos_idx].y.label*score;
         if (c_loss < 0.0){
           c_loss = 0.0;
-        } 
-        if (c_loss > 0.0) {
-            scaleFactor = eta*ex[pos_idx].y.label/example_per_iter;
-            add_vector_ns(w_update, ex[pos_idx].h.phi_h_i, scaleFactor);
+        }         
+         // scale w 
+        scaleFactor = 1.0 - eta_pos*lambda_pos;
+        for(k = 1; k < sm.sizePsi+1; k++){
+            w[k] = scaleFactor*w[k];
         }
+        if (c_loss > 0.0) {
+            scaleFactor = eta_pos*ex[pos_idx].y.label/example_per_iter;
+            add_vector_ns(w, ex[pos_idx].h.phi_h_i, scaleFactor);
+        }
+        norm2 = sprod_nn(w, w, sm.sizePsi);
+        if (norm2 > 1.0/lambda_pos) {
+          scaleFactor = sqrt(1.0/(lambda_pos*norm2));
+          for(k = 1; k < sm.sizePsi+1; k++){
+            w[k] = scaleFactor*w[k];
+          }
+        }
+        iterations++;
 
         // pick n_neg_sample random negative sample
         for ( i = 0; i < n_neg_sample; i++){          
@@ -212,39 +228,35 @@ int main(int argc, char* argv[]) {
           neg_idx = sample.neg_idx[r];
           fvecs = readFeatures(ex[neg_idx].x.file_name, ex[neg_idx].x.n_candidates);
           for (j = 0; j < ex[neg_idx].x.n_candidates; j++){
+            eta_neg = 1 / (lambda_neg * (iterations+2)); 
             score = sprod_ns(w, fvecs[j]);
             c_loss = 1 - ex[neg_idx].y.label*score;
             if (c_loss < 0.0){
                 c_loss = 0.0;
-            } 
-            if (c_loss > 0.0) {
-                scaleFactor = eta*ex[neg_idx].y.label/example_per_iter;
-                add_vector_ns(w_update, fvecs[j], scaleFactor);
+            }             
+             // scale w 
+            scaleFactor = 1.0 - eta_neg*lambda_neg;
+            for(k = 1; k < sm.sizePsi+1; k++){
+                w[k] = scaleFactor*w[k];
             }
+            if (c_loss > 0.0) {
+                scaleFactor = eta_neg*ex[neg_idx].y.label/example_per_iter;
+                add_vector_ns(w, fvecs[j], scaleFactor);
+            }
+            norm2 = sprod_nn(w, w, sm.sizePsi);
+            if (norm2 > 1.0/lambda_neg) {
+              scaleFactor = sqrt(1.0/(lambda_neg*norm2));
+              for(k = 1; k < sm.sizePsi+1; k++){
+                w[k] = scaleFactor*w[k];
+              }
+            }
+            iterations++;
           }
           for (j = 0; j < ex[neg_idx].x.n_candidates; j++){
               free_svector(fvecs[j]);
           }
           free(fvecs);
         } 
-        
-
-         // scale w 
-        scaleFactor = 1.0 - eta*lambda;
-        for(k = 1; k < sm.sizePsi+1; k++){
-            w[k] = scaleFactor*w[k];
-        }
-
-        add_vector_nn(w, w_update, sm.sizePsi, 1);
-        clear_nvector(w_update, sm.sizePsi);
-
-        norm2 = sprod_nn(w, w, sm.sizePsi);
-        if (norm2 > 1.0/lambda) {
-          scaleFactor = sqrt(1.0/(lambda*norm2));
-          for(k = 1; k < sm.sizePsi+1; k++){
-            w[k] = scaleFactor*w[k];
-          }
-        }
     }
     norm2 = sprod_nn(w, w, sm.sizePsi);
     //primal_obj = norm2 * lambda / 2.0;
@@ -258,7 +270,7 @@ int main(int argc, char* argv[]) {
           score = sprod_ns(w, ex[i].h.phi_h_i);
           c_loss = 1 - ex[i].y.label*score;
           if (c_loss < 0.0) c_loss = 0.0;
-          primal_obj += C*c_loss/n_examples;
+          primal_obj += C_pos*c_loss/n_examples;
       }
       else{
           fvecs = readFeatures(ex[i].x.file_name, ex[i].x.n_candidates);
@@ -266,7 +278,7 @@ int main(int argc, char* argv[]) {
               score = sprod_ns(w, fvecs[j]);
               c_loss = 1 - ex[i].y.label*score;
               if (c_loss < 0.0) c_loss = 0.0;
-              primal_obj += C*c_loss/n_examples;
+              primal_obj += C_neg*c_loss/n_examples;
           }
           for (j = 0; j < ex[i].x.n_candidates; j++){
               free_svector(fvecs[j]);
@@ -286,7 +298,7 @@ int main(int argc, char* argv[]) {
 			printf("cccp decrement: N/A\n"); fflush(stdout);
 		}
     
-    stop_crit = (decrement<C*epsilon);
+    stop_crit = (decrement<C_neg*epsilon);
   
     /* impute latent variable using updated weight vector */
 		if(!stop_crit) {
@@ -339,7 +351,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   long i;
 
   /* set default */
-  learn_parm->maxiter=10;
+  learn_parm->maxiter=100000;
   learn_parm->svm_c=100.0;
   learn_parm->eps=0.001;
   struct_parm->seed=1;
