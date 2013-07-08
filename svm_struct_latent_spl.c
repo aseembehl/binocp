@@ -343,7 +343,7 @@ double* add_list_nn(SVECTOR *a, long totwords)
   
 }*/
 
-  /*int main(int argc, char* argv[]) {
+  int main(int argc, char* argv[]) {
 
   double *w; // weight vector 
   double *w_update;
@@ -453,7 +453,7 @@ double* add_list_nn(SVECTOR *a, long totwords)
   double scaleFactor;
 
   srand(sparm.seed);
-  while ((outer_iter<2)||((!stop_crit)&&(outer_iter<MAX_OUTER_ITER))) { 
+  while ((outer_iter<9)||((!stop_crit)&&(outer_iter<MAX_OUTER_ITER))) { 
 
     printf("OUTER ITER %d\n", outer_iter); 
     fflush(stdout);
@@ -605,9 +605,9 @@ double* add_list_nn(SVECTOR *a, long totwords)
    
   return(0); 
   
-}*/
+}
 
-  int main(int argc, char* argv[]) {
+ /* int main(int argc, char* argv[]) {
 
   double *w; // weight vector 
   double *w_update;
@@ -875,7 +875,7 @@ double* add_list_nn(SVECTOR *a, long totwords)
    
   return(0); 
   
-}
+}*/
 
 void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *init_modelfile, char *objfile, 
 			      LEARN_PARM *learn_parm, STRUCT_LEARN_PARM *struct_parm) {
