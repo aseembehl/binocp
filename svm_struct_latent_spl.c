@@ -727,7 +727,7 @@ double* add_list_nn(SVECTOR *a, long totwords)
     //solve svm. Compute primal objective
     lambda = 1/(double) C;
     for (iterations = 0; iterations < MAX_ITER; iterations++) {
-        if(iterations % 25 == 0){
+        if(iterations % 10000 == 0){
             printf("%d Pegasos iteration\n", iterations); fflush(stdout);
         }
         // learning rate
