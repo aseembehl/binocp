@@ -318,7 +318,7 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
 
   int j;
   double maxScore = -DBL_MAX;
-  doubel cur_score;
+  double cur_score;
 
   SVECTOR **fvecs;
 
