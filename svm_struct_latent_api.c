@@ -333,8 +333,8 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
               if(x.areaRatios[j] > sparm->min_area_ratios[outer_iter]){
               	cur_score = sprod_ns(sm->w, fvecs[j]);
               	if(cur_score != 0){
-	                if(sprod_ns(sm->w, fvecs[j]) > maxScore){
-	                    maxScore = sprod_ns(sm->w, fvecs[j]);
+	                if(cur_score > maxScore){
+	                    maxScore = cur_score;
 	                    h.best_bb = j;
 	                }
             	}
@@ -343,8 +343,8 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
           else{
           		cur_score = sprod_ns(sm->w, fvecs[j]);
           		if(cur_score != 0){
-          			if(sprod_ns(sm->w, fvecs[j]) > maxScore){
-		               maxScore = sprod_ns(sm->w, fvecs[j]);
+          			if(cur_score > maxScore){
+		               maxScore = cur_score;
 		               h.best_bb = j;
 		             }
           		}
